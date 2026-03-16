@@ -108,12 +108,12 @@ return [
 
     'swagger_ui' => [
         'enabled' => true,
-        // 'apiKeys' => [
-        //     'api' => [
-        //         'name' => 'Authorization',
-        //         'type' => 'header',
-        //     ],
-        // ],
+         'apiKeys' => [
+             'api' => [
+                 'name' => 'Authorization',
+                 'type' => 'header',
+             ],
+         ],
         // 'oauth' => [
         //     'enabled' => true,
         //     'type' => 'oauth2',
