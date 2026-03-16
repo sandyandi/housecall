@@ -11,6 +11,7 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Enums\ReferralPriority;
 use App\Enums\ReferralStatus;
+use App\Http\Middlewares\CheckIdempotency;
 use Database\Factories\ReferralFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,7 +22,10 @@ use Illuminate\Support\Facades\Log;
     operations: [
         new GetCollection(),
         new Post(
-            middleware: ['throttle:create-referral'],
+            middleware: [
+                'throttle:create-referral',
+                CheckIdempotency::class,
+            ],
         ),
         new Get(),
         new Patch(
