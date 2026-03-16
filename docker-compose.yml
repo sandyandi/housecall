@@ -1,0 +1,50 @@
+services:
+  app:
+    image: webdevops/php-nginx:8.5-alpine
+    container_name: housecall-api
+    working_dir: /app
+    ports:
+      - "8000:80"
+    volumes:
+      - .:/app
+      - ./infra/default.conf:/opt/docker/etc/nginx/vhost.common.conf:ro
+    environment:
+      - WEB_DOCUMENT_ROOT=/app/public
+      - PHP_DISPLAY_ERRORS=${APP_DEBUG:-0}
+      - PHP_MEMORY_LIMIT=512M
+    depends_on:
+      - db
+      - redis
+
+  worker:
+    image: webdevops/php-nginx:8.5-alpine
+    container_name: housecall-worker
+    working_dir: /app
+    command: /usr/local/bin/php artisan queue:work --verbose --tries=3 --timeout=90
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: postgres:18-alpine
+    container_name: housecall-db
+    environment:
+      - POSTGRES_DB=housecall
+      - POSTGRES_USER=housecall
+      - POSTGRES_PASSWORD=secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:8-alpine
+    container_name: housecall-redis
+    volumes:
+      - redis_data:/data
+
+volumes:
+  db_data:
+  redis_data:
