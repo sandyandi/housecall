@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use ApiPlatform\Laravel\Eloquent\Filter\EqualsFilter;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\QueryParameter;
 use App\Enums\ReferralPriority;
 use App\Enums\ReferralStatus;
 use App\Http\Middlewares\CheckIdempotency;
@@ -21,7 +23,11 @@ use Illuminate\Support\Facades\Log;
 
 #[ApiResource(
     operations: [
-        new GetCollection(),
+        new GetCollection(
+            parameters: [
+                'status' => new QueryParameter(key: 'status', filter: EqualsFilter::class),
+            ],
+        ),
         new Post(
             middleware: [
                 'throttle:create-referral',
