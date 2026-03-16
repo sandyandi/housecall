@@ -12,6 +12,7 @@ use ApiPlatform\Metadata\Post;
 use App\Enums\ReferralPriority;
 use App\Enums\ReferralStatus;
 use App\Http\Middlewares\CheckIdempotency;
+use App\Jobs\TriageReferral;
 use Database\Factories\ReferralFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -71,6 +72,7 @@ class Referral extends Model
     {
         static::created(function (self $referral) {
             Log::info('Referral created', ['referral' => $referral->toArray()]);
+            TriageReferral::dispatch($referral);
         });
     }
 
@@ -85,5 +87,26 @@ class Referral extends Model
             'priority' => ReferralPriority::class,
             'status' => ReferralStatus::class,
         ];
+    }
+
+    public function triage(): void
+    {
+        if ($this->status !== ReferralStatus::RECEIVED) {
+            Log::info('Skipping triage for referral', ['referral' => $this->toArray()]);
+            return;
+        }
+
+        Log::info('Triaging referral', ['referral' => $this->toArray()]);
+        $this->status = ReferralStatus::TRIAGING;
+        $this->save();
+
+        $status = match($this->priority) {
+            ReferralPriority::HIGH, ReferralPriority::MEDIUM => ReferralStatus::ACCEPTED,
+            ReferralPriority::LOW => ReferralStatus::REJECTED,
+        };
+
+        $this->status = $status;
+        $this->save();
+        Log::info('Triage complete: referral status set to: ' . $status->value, ['referral' => $this->toArray()]);
     }
 }
