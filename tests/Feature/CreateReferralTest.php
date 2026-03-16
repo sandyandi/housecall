@@ -1,30 +1,100 @@
 <?php
 
-use App\Models\Referral;
+namespace Tests\Feature;
+
+use ApiPlatform\Laravel\Test\ApiTestAssertionsTrait;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
-uses(RefreshDatabase::class);
+class CreateReferralTest extends TestCase
+{
+    use ApiTestAssertionsTrait, RefreshDatabase;
 
-test('successfully creates referral with idempotency key header', function () {
-    $payload = [
-        'name' => 'John Doe',
-        'age' => 40,
-        'address' => 'Some address',
-        'reason' => 'Some reason',
-        'priority' => 'low',
-    ];
+    public function testUnauthenticatedUsersAreNotAllowedToAccessReferrals()
+    {
+        $this
+            ->getJson('/api/v1/referrals')
+            ->assertUnauthorized();
+    }
 
-    $response = $this
-        ->withHeader('Idempotency-Key', 'key1')
-        ->withHeader('Content-Type', 'application/ld+json')
-        ->post('/api/v1/referrals', $payload);
+    public function testAuthenticatedUsersAreAllowedToAccessReferrals()
+    {
+        $user = User::factory()->create();
+        $token = $user->createToken('api-token')->plainTextToken;
 
-    $response->assertStatus(201);
-    
-    $this->assertDatabaseHas('referrals', [
-        'name' => 'John Doe',
-        'age' => 40,
-    ]);
-});
+        $this
+            ->withHeader('authorization', 'bearer ' . $token)
+            ->getJson('/api/v1/referrals')
+            ->assertOk();
+    }
 
+    public function testReferralCreationFailsIfIdempotencyKeyIsNotPresent()
+    {
+        $user = User::factory()->create();
+        $token = $user->createToken('api-token')->plainTextToken;
 
+        $this
+            ->withHeader('authorization', 'bearer ' . $token)
+            ->postJson('/api/v1/referrals', [
+                'name' => 'John Doe',
+                'age' => 40,
+                'address' => 'Some Address',
+                'reason' => 'Some reason',
+                'priority' => 'medium',
+                'source' => 'Some Source',
+            ])
+            ->assertBadRequest();
+    }
+
+    public function testReferralCreationSucceedsIfIdempotencyKeyIsPresent()
+    {
+        $user = User::factory()->create();
+        $token = $user->createToken('api-token')->plainTextToken;
+
+        $this
+            ->withHeader('authorization', 'bearer ' . $token)
+            ->withHeader('idempotency-key', 'key1')
+            ->postJson('/api/v1/referrals', [
+                'name' => 'John Doe',
+                'age' => 40,
+                'address' => 'Some Address',
+                'reason' => 'Some reason',
+                'priority' => 'medium',
+                'source' => 'Some Source',
+            ])
+            ->assertCreated();
+    }
+
+    public function testDuplicatedReferralCreationIsPreventedForTheSameIdempotencyKey()
+    {
+        $user = User::factory()->create();
+        $token = $user->createToken('api-token')->plainTextToken;
+
+        $this
+            ->withHeader('authorization', 'bearer ' . $token)
+            ->withHeader('idempotency-key', 'key1')
+            ->postJson('/api/v1/referrals', [
+                'name' => 'John Doe',
+                'age' => 40,
+                'address' => 'Some Address',
+                'reason' => 'Some reason',
+                'priority' => 'medium',
+                'source' => 'Some Source',
+            ])
+            ->assertCreated();
+
+        $this
+            ->withHeader('authorization', 'bearer ' . $token)
+            ->withHeader('idempotency-key', 'key1')
+            ->postJson('/api/v1/referrals', [
+                'name' => 'John Doe',
+                'age' => 40,
+                'address' => 'Some Address',
+                'reason' => 'Some reason',
+                'priority' => 'medium',
+                'source' => 'Some Source',
+            ])
+            ->assertOk();
+    }
+}
